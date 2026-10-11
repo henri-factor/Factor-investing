@@ -97,6 +97,11 @@
   .exhint{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px}
   .exrow{display:flex;gap:12px;align-items:center;margin-bottom:10px}
   #exText{width:100%;height:240px;font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--ink);background:var(--paper);resize:vertical}
+  .guide h3{font-size:14px;margin:16px 0 6px;color:var(--ink)}
+  .guide ol,.guide ul{margin:0 0 6px 20px;padding:0;font-size:13px;line-height:1.55}
+  .guide li{margin-bottom:4px}
+  .guide p{font-size:13px;line-height:1.55;margin:0 0 6px}
+  a.btn{text-decoration:none;display:inline-block}
 </style>
 </head>
 <body>
@@ -107,7 +112,54 @@
       <span class="tag">Quarterly long-portfolio rebalance</span>
     </div>
     <div class="sub">Drop in your TradingView screener export. The desk runs the same value / profitability / momentum model as your workbook, sizes the top names, and builds the Interactive Brokers basket — no leftover rows, no manual recalculation.</div>
+    <div class="btnrow" style="margin-top:10px"><button class="btn ghost mini" id="guidebtn">📖 How to use</button></div>
   </header>
+
+  <!-- BUILT-IN GUIDE -->
+  <div class="card hide" id="card-guide">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">How to use Factor Desk</h2>
+      <button class="btn ghost mini" id="guideclose">Close</button>
+    </div>
+    <div class="note" style="margin:8px 0 4px">Your data stays in your own browser and your own Google Drive. Nobody else using this link can see it.</div>
+    <div class="btnrow" style="margin:10px 0 4px">
+      <a class="btn ghost mini" href="Factor_Desk_User_Guide.docx" download>Full guide (Word)</a>
+      <a class="btn ghost mini" href="XIRR_Benchmark_Template.xlsx" download>Returns sheet template</a>
+      <a class="btn ghost mini" href="FactorDesk_AppsScript.gs" download>Drive auto-save script</a>
+    </div>
+    <div class="guide">
+      <h3>What you need</h3>
+      <ul>
+        <li>A computer with Chrome (not a phone) and an Interactive Brokers account with BasketTrader.</li>
+        <li>The TradingView screener export (CSV) with the same filters, and these columns: Symbol, Description, Exchange, Sector, Industry, Price, Market cap, Price to earnings, Enterprise value to EBITDA, Return on equity, Performance 1 month, 3 months, 6 months and 1 year.</li>
+      </ul>
+      <h3>First time</h3>
+      <ol><li>Bookmark this page.</li><li>In the <b>Portfolio</b> box below, click <b>Edit</b> and give the portfolio your own name.</li></ol>
+      <h3>Every quarter</h3>
+      <ol>
+        <li><b>Step 1:</b> drop the TradingView CSV onto the first box.</li>
+        <li><b>Step 2:</b> enter Capital in <b>USD</b> and the number of stocks (30). Leave the weights as they are.</li>
+        <li><b>Step 3:</b> check the top 30; click × to remove a name. The next-best fills in.</li>
+        <li><b>Step 4:</b> drop your IB Activity Statement CSV (Client Portal → Performance &amp; Reports → Statements → Activity, Daily, today, CSV). New account with no stocks: click <b>I hold nothing yet</b>.</li>
+        <li><b>Chart-review list</b> tab: download and import into TradingView (Watchlist → ⋯ → Import list). Remove anything that looks wrong in step 3.</li>
+        <li>Check the <b>Resulting portfolio</b> and <b>Positions sold</b> tabs.</li>
+        <li>Enter a Quarter label (e.g. “2026 Q4”) and your IB account number, then click <b>Build basket &amp; save quarter</b>.</li>
+        <li>Click <b>Download this quarter (.zip)</b> and keep it in your Google Drive.</li>
+        <li>Load the basket CSV into IB BasketTrader, check it, and transmit.</li>
+      </ol>
+      <h3>Deposits and withdrawals</h3>
+      <p>Whenever you move money into or out of IB: Portfolio box → <b>Deposits &amp; withdrawals</b> → date, type, positive amount → <b>Record</b>. No files needed. Entries are saved with your next quarterly save.</p>
+      <h3>Good to know</h3>
+      <ul>
+        <li><b>Capital</b> is in USD (it sizes the positions). <b>Cash</b> and <b>deposits</b> are in your account's base currency (e.g. EUR).</li>
+        <li>Always use a fresh IB statement. Names you keep are adjusted to the new quantity, never sold and rebought.</li>
+        <li>Saving the same Quarter label again overwrites that quarter. “2026 Q4” and “Q4 2026” are different.</li>
+        <li>Only <b>Build basket &amp; save quarter</b> and <b>Download this quarter (.zip)</b> save anything. Everything else is safe to try.</li>
+        <li>Your history lives in this browser. Click <b>Backup</b> every quarter; use <b>Restore</b> on another computer.</li>
+        <li>Returns vs the S&amp;P 500 and automatic Drive saving are optional. See the full guide.</li>
+      </ul>
+    </div>
+  </div>
 
   <div class="steps">
     <div class="step on" data-step="1"><span class="n">1</span> Load screen</div>
@@ -1381,6 +1433,8 @@ $('#dlbasket').onclick=()=>{
 };
 $('#dlzip').onclick=downloadQuarterZip;
 $('#cfrecord').onclick=recordFlow;
+$('#guidebtn').onclick=()=>{ const g=$('#card-guide'); g.classList.toggle('hide'); if(!g.classList.contains('hide')) g.scrollIntoView({behavior:'smooth'}); };
+$('#guideclose').onclick=()=>$('#card-guide').classList.add('hide');
 $('#synctest').onclick=testSyncConnection;
 $('#dldata').onclick=()=>{
   const label=$('#qlabel').value.trim()||'portfolio';
@@ -1403,6 +1457,7 @@ $('#syncsecret').addEventListener('change',()=>{ const p=activePF(); if(p){ p.se
 
 restore();
 renderPFsel();
+if(PORTFOLIOS.every(p=>!(p.hist&&p.hist.length) && !p.url && !(p.flows&&p.flows.length))) $('#card-guide').classList.remove('hide');
 applyLastSettings();
 renderHist();
 </script>
