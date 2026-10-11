@@ -140,7 +140,7 @@
         <li><b>Step 1:</b> drop the TradingView CSV onto the first box.</li>
         <li><b>Step 2:</b> enter Capital in <b>USD</b> and the number of stocks (30). Leave the weights as they are.</li>
         <li><b>Step 3:</b> check the top 30; click × to remove a name. The next-best fills in.</li>
-        <li><b>Step 4:</b> drop your IB Activity Statement CSV (Client Portal → Performance &amp; Reports → Statements → Activity, Daily, today, CSV). New account with no stocks: click <b>I hold nothing yet</b>.</li>
+        <li><b>Step 4:</b> drop your <b>IB Activity Statement CSV</b> (not the TradingView file — that only goes in step 1) (Client Portal → Performance &amp; Reports → Statements → Activity, Daily, today, CSV). New account with no stocks: click <b>I hold nothing yet</b>.</li>
         <li><b>Chart-review list</b> tab: download and import into TradingView (Watchlist → ⋯ → Import list). Remove anything that looks wrong in step 3.</li>
         <li>Check the <b>Resulting portfolio</b> and <b>Positions sold</b> tabs.</li>
         <li>Enter a Quarter label (e.g. “2026 Q4”) and your IB account number, then click <b>Build basket &amp; save quarter</b>.</li>
@@ -315,9 +315,10 @@
     <div class="btnrow">
       <button class="btn accent" id="dlbasket">Build basket &amp; save quarter</button>
       <button class="btn" id="dlzip">Download this quarter (.zip)</button>
+      <button class="btn ghost" id="dlbasketonly">Download basket only (no save)</button>
       <button class="btn ghost" id="dldata">Data workbook only (CSV)</button>
     </div>
-    <div class="note" id="savehint" style="margin-top:8px"><b>Build basket &amp; save quarter</b> downloads the IB BasketTrader CSV and saves the quarter in this browser (and to Drive if you set up sync). <b>Download this quarter (.zip)</b> bundles the basket, data and chart-review files into one file you can drop into any Drive folder yourself — no setup needed. Re-saving the same Quarter label overwrites that quarter.</div>
+    <div class="note" id="savehint" style="margin-top:8px"><b>Build basket &amp; save quarter</b> downloads the IB BasketTrader CSV and saves the quarter in this browser (and to Drive if you set up sync). <b>Download this quarter (.zip)</b> bundles the basket, data and chart-review files into one file you can drop into any Drive folder yourself — no setup needed. Re-saving the same Quarter label overwrites that quarter. <b>Download basket only</b> saves nothing — use it to test or to look at the orders first.</div>
   </div>
 
   <!-- HISTORY -->
@@ -729,8 +730,19 @@ function parseHoldings(text){
 function applyHoldings(text){
   setTimeout(()=>{ if(typeof renderLedger==='function') renderLedger(); },0);
   S.baseCcy=null; S.usdToBase=null; S.ibCash=null; S.ibStock=null; S.ibNav=null; S.ibValue=null; S.ibDate=null;
+  // Reject files that are clearly not "what I hold now" — otherwise every row becomes a position
+  // and the basket would SELL thousands of names.
+  const head=((text||'').replace(/^\uFEFF/,'').split(/\r?\n/).find(l=>l.trim())||'').toLowerCase();
+  const reject=(title,detail)=>{ S.prevBasket=null; S.held={}; S.basket=null; $('#basketmeta').innerHTML='';
+    renderChecks($('#holdchecks'),[[false,title,detail]]); };
+  if(/market capitali|performance %|price to earnings|enterprise value to ebitda/.test(head)){
+    reject('This is the TradingView screener file, not your positions','The screener goes into step 1. Here you need your IB Activity Statement CSV (Client Portal → Performance & Reports → Statements → Activity → CSV).'); return; }
+  if(/^action,symbol,quantity/.test(head) || /ordertype|basket ?tag/.test(head)){
+    reject('This is a BasketTrader order file, not your positions','Orders are not holdings — fills and renames make them differ. Drop your IB Activity Statement CSV instead.'); return; }
   const map=parseHoldings(text);
   const n=Object.keys(map).length;
+  if(n>150){
+    reject(`This file lists ${n} rows — that is not a positions list`,'Drop your IB Activity Statement CSV (it lists only what you actually hold).'); return; }
   if(!n){
     renderChecks($('#holdchecks'),[[false,'No positions recognised','Use lines like "AENT 188", drop your IB Activity Statement CSV, or paste your TWS grid.']]);
     return;
@@ -1432,6 +1444,7 @@ $('#dlbasket').onclick=()=>{
   saveQuarter();
 };
 $('#dlzip').onclick=downloadQuarterZip;
+$('#dlbasketonly').onclick=()=>{ if(!basketReady()) return; const l=($('#qlabel').value.trim()||'test').replace(/\s+/g,'_'); download(l+'_basket_UNSAVED.csv', basketCSV()); };
 $('#cfrecord').onclick=recordFlow;
 $('#guidebtn').onclick=()=>{ const g=$('#card-guide'); g.classList.toggle('hide'); if(!g.classList.contains('hide')) g.scrollIntoView({behavior:'smooth'}); };
 $('#guideclose').onclick=()=>$('#card-guide').classList.add('hide');
