@@ -1398,15 +1398,22 @@ function testSyncConnection(){
     return;
   }
   st.style.color='var(--ink-soft)'; st.textContent='Testing…';
-  // The health check is a GET; Apps Script allows it cross-origin.
-  fetch(url,{method:'GET'}).then(r=>r.json()).then(j=>{
-    if(j && j.ok){ st.style.color='var(--buy)'; st.textContent='\u2713 Connected — your Drive sync is working.'; }
-    else { st.style.color='var(--warn)'; st.textContent='Reached the script but it didn\u2019t report OK. Re-check you pasted the whole script and re-deployed.'; }
-  }).catch(()=>{
-    // Opaque/blocked response is common even when it actually works; guide rather than fail hard.
-    st.style.color='var(--warn)';
-    st.textContent='Couldn\u2019t confirm. Most common cause: in Deploy you must set “Who has access” to “Anyone”. Fix that, re-deploy, and test again.';
-  });
+  // JSONP: a <script> tag may load from Google across sites and follows its
+  // redirect, unlike fetch(), so this works whatever the browser's CORS rules.
+  const cb='fdPing'+Date.now();
+  const tag=document.createElement('script');
+  let done=false;
+  const finish=(ok,msg)=>{ if(done) return; done=true; st.style.color=ok?'var(--buy)':'var(--warn)'; st.textContent=msg; try{ delete window[cb]; }catch(e){ window[cb]=undefined; } tag.remove(); };
+  window[cb]=(j)=>{
+    if(!j || !j.ok) return finish(false,'Reached the script but it didn\u2019t report OK. Re-paste the whole script and re-deploy.');
+    if(!j.version) return finish(true,'\u2713 Connected — but your script is an OLD version: deposits/withdrawals won\u2019t reach the sheet. Paste the latest FactorDesk_AppsScript.gs and re-deploy (Manage deployments → Edit → New version).');
+    finish(true,'\u2713 Connected — your Drive sync is working (script version '+j.version+').');
+  };
+  tag.onload=()=>setTimeout(()=>{ if(!done) finish(false,'Your script answered, but it is an OLD version (or not the Factor Desk script). Paste the latest FactorDesk_AppsScript.gs, then Deploy → Manage deployments → Edit → New version → Deploy, and test again.'); },400);
+  tag.onerror=()=>finish(false,'Not confirmed. Open the URL in a new browser tab. If it shows {"ok":true…} without "version", the script is an OLD version: paste the latest FactorDesk_AppsScript.gs, then Deploy → Manage deployments → Edit → New version → Deploy. If it asks you to sign in or shows an error, set “Who has access” to “Anyone” the same way.');
+  tag.src=url+(url.includes('?')?'&':'?')+'callback='+cb+'&t='+Date.now();
+  document.body.appendChild(tag);
+  setTimeout(()=>finish(false,'No answer from the script within 15 seconds. Open the URL in a new tab to check it is live, then test again.'),15000);
 }
 
 /* ---- wiring ---- */
