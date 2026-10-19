@@ -145,7 +145,8 @@
         <li>Check the <b>Resulting portfolio</b> and <b>Positions sold</b> tabs.</li>
         <li>Enter a Quarter label (e.g. “2026 Q4”) and your IB account number, then click <b>Build basket &amp; save quarter</b>.</li>
         <li>Click <b>Download this quarter (.zip)</b> and keep it in your Google Drive.</li>
-        <li>Load the basket CSV into IB BasketTrader, check it, and transmit.</li>
+        <li>Load the basket into IB BasketTrader and transmit. <b>Cash account</b> (Buying Power equals your cash): use <b>1 · Sells only</b> first, wait until filled, then <b>2 · Buys only</b>.</li>
+        <li>If the tool warns about a <b>fractional</b> position (after a merger), sell that fraction by hand in IB Client Portal or the mobile app.</li>
       </ol>
       <h3>Deposits and withdrawals</h3>
       <p>Whenever you move money into or out of IB: Portfolio box → <b>Deposits &amp; withdrawals</b> → date, type, positive amount → <b>Record</b>. No files needed. Entries are saved with your next quarterly save.</p>
@@ -316,9 +317,13 @@
       <button class="btn accent" id="dlbasket">Build basket &amp; save quarter</button>
       <button class="btn" id="dlzip">Download this quarter (.zip)</button>
       <button class="btn ghost" id="dlbasketonly">Download basket only (no save)</button>
+    </div>
+    <div class="btnrow" style="margin-top:6px">
+      <button class="btn ghost mini" id="dlsells">1 · Sells only — transmit first</button>
+      <button class="btn ghost mini" id="dlbuys">2 · Buys only — after the sells have filled</button>
       <button class="btn ghost" id="dldata">Data workbook only (CSV)</button>
     </div>
-    <div class="note" id="savehint" style="margin-top:8px"><b>Build basket &amp; save quarter</b> downloads the IB BasketTrader CSV and saves the quarter in this browser (and to Drive if you set up sync). <b>Download this quarter (.zip)</b> bundles the basket, data and chart-review files into one file you can drop into any Drive folder yourself — no setup needed. Re-saving the same Quarter label overwrites that quarter. <b>Download basket only</b> saves nothing — use it to test or to look at the orders first.</div>
+    <div class="note" id="savehint" style="margin-top:8px"><b>Build basket &amp; save quarter</b> downloads the IB BasketTrader CSV and saves the quarter in this browser (and to Drive if you set up sync). <b>Download this quarter (.zip)</b> bundles the basket, data and chart-review files into one file you can drop into any Drive folder yourself — no setup needed. Re-saving the same Quarter label overwrites that quarter. <b>Download basket only</b> saves nothing — use it to test or to look at the orders first. <b>Cash account</b> (Buying Power = your cash): buys are paid with the sale proceeds, so transmit the <b>Sells only</b> file first and the <b>Buys only</b> file once the sells show Filled. These two buttons save nothing either.</div>
   </div>
 
   <!-- HISTORY -->
@@ -1470,6 +1475,11 @@ $('#dlbasket').onclick=()=>{
   saveQuarter();
 };
 $('#dlzip').onclick=downloadQuarterZip;
+function partCSV(action){ const lines=basketCSV().split(/\r?\n/); return [lines[0]].concat(lines.slice(1).filter(l=>l.startsWith(action+','))).join('\r\n')+'\r\n'; }
+['sells','buys'].forEach(k=>{ $('#dl'+k).onclick=()=>{ if(!basketReady()) return;
+  const act=k==='sells'?'SELL':'BUY', csv=partCSV(act), n=csv.trim().split(/\r?\n/).length-1;
+  if(!n){ alert('This basket has no '+act+' orders.'); return; }
+  const l=($('#qlabel').value.trim()||'basket').replace(/\s+/g,'_'); download(l+(k==='sells'?'_1_SELLS.csv':'_2_BUYS.csv'), csv); }; });
 $('#dlbasketonly').onclick=()=>{ if(!basketReady()) return; const l=($('#qlabel').value.trim()||'test').replace(/\s+/g,'_'); download(l+'_basket_UNSAVED.csv', basketCSV()); };
 $('#cfrecord').onclick=recordFlow;
 $('#guidebtn').onclick=()=>{ const g=$('#card-guide'); g.classList.toggle('hide'); if(!g.classList.contains('hide')) g.scrollIntoView({behavior:'smooth'}); };
