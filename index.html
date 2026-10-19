@@ -216,7 +216,7 @@
     <div class="controls">
       <div class="ctl"><label>Capital</label><input type="number" id="capital" value="100000" min="0" step="1000"></div>
       <div class="ctl"><label>Currency</label>
-        <select id="ccy"><option>EUR</option><option>USD</option><option>GBP</option></select></div>
+        <select id="ccy"><option selected>USD</option><option>EUR</option><option>GBP</option></select></div>
       <div class="ctl"><label>Number of stocks</label><input type="number" id="nstocks" value="30" min="1" max="100"></div>
       <div class="ctl"><label>Momentum weight</label><input type="number" id="wMom" value="2" min="0" step="0.5"></div>
       <div class="ctl"><label>Value weight</label><input type="number" id="wVal" value="1" min="0" step="0.5"></div>
@@ -608,6 +608,15 @@ function renderSanity(){
   items.push([noPx.length===0, noPx.length===0?'All selected names have a price':`${noPx.length} selected names missing price`,'']);
   const zeroQ=sel.filter(d=>d.qty<=0);
   items.push([zeroQ.length===0, zeroQ.length===0?'Every name has a tradeable quantity':`${zeroQ.length} names priced above per-stock budget`, zeroQ.length?zeroQ.map(d=>d.sym).join(', '):'']);
+  // Capital sizes positions against USD prices, so it must be USD and must fit the account.
+  const ccy=getCap().ccy;
+  if(ccy!=='USD') items.push([false,`Capital is set to ${ccy}`,'Share counts are calculated from USD prices — set the Capital currency to USD.']);
+  if(S.ibNav && S.usdToBase){
+    const navUSD=S.ibNav/S.usdToBase;
+    if(capital>navUSD) items.push([false,`Capital ${fmt0(capital)} USD is more than your whole account (${fmt0(navUSD)} USD)`,
+      `The basket would need a margin loan of about ${fmt0(capital-navUSD)} USD. Set Capital to at most ${fmt0(navUSD)} USD — a little less leaves room for price moves and fees.`]);
+    else items.push([true,`Capital fits the account`,`account ${fmt0(navUSD)} USD (${S.ibNav.toFixed(0)} ${S.baseCcy||''}) · capital ${fmt0(capital)} USD · ${fmt0(navUSD-capital)} USD stays as cash`]);
+  }
   renderChecks($('#sanity'),items);
 }
 
@@ -682,7 +691,7 @@ function parseHoldings(text){
         const q=NUM((p[qi]||'').replace(/[, ]/g,''));
         if(!sym || q===null || q<=0) continue;
         if(!/^[A-Z][A-Z0-9.\-]*$/.test(sym)) continue;
-        map[sym]=(map[sym]||0)+Math.round(q);
+        map[sym]=(map[sym]||0)+q;
         // remember the statement's USD market value per position (col "Value")
         const vi=cols.indexOf('value');
         if(vi>=0){ const v=NUM((p[vi]||'').replace(/[, ]/g,'')); if(v!==null){ S.ibValue=S.ibValue||{}; S.ibValue[sym]=v; } }
@@ -722,7 +731,7 @@ function parseHoldings(text){
     sym=sym.toUpperCase().replace(/[^A-Z0-9.\-]/g,'');
     if(!sym||!/^[A-Z]/.test(sym)) continue;
     if(qty<=0) continue;                 // ignore zero/short rows
-    map[sym]=(map[sym]||0)+Math.round(qty);
+    map[sym]=(map[sym]||0)+qty;
   }
   return map;
 }
@@ -740,6 +749,12 @@ function applyHoldings(text){
   if(/^action,symbol,quantity/.test(head) || /ordertype|basket ?tag/.test(head)){
     reject('This is a BasketTrader order file, not your positions','Orders are not holdings — fills and renames make them differ. Drop your IB Activity Statement CSV instead.'); return; }
   const map=parseHoldings(text);
+  // BasketTrader trades whole shares. Rounding 24.9033 up to 25 would SELL more
+  // than you own. Use the whole-share part and report the fraction to close by hand.
+  S.fractional={};
+  Object.keys(map).forEach(k=>{ const q=map[k], whole=Math.floor(q+1e-6), fr=+(q-whole).toFixed(6);
+    if(fr>1e-6) S.fractional[k]={held:q, whole, frac:fr};
+    if(whole>0) map[k]=whole; else delete map[k]; });
   const n=Object.keys(map).length;
   if(n>150){
     reject(`This file lists ${n} rows — that is not a positions list`,'Drop your IB Activity Statement CSV (it lists only what you actually hold).'); return; }
@@ -760,7 +775,11 @@ function applyHoldings(text){
   if(S.ibNav){
     checks.push([true,`Account value on statement date`, `${S.ibNav.toFixed(2)} ${S.baseCcy||''} (stocks ${(S.ibStock||0).toFixed(2)} + cash ${(S.ibCash||0).toFixed(2)}) — this is what the XIRR sheet records`]);
   }
+  Object.entries(S.fractional||{}).forEach(([k,f])=>checks.push([false,
+    `${k}: you hold ${f.held} shares (fractional, e.g. from a merger)`,
+    `The basket uses ${f.whole} whole share${f.whole===1?'':'s'}. ${S.target&&S.target[k]?'':'Sell the remaining '+f.frac+' share by hand in IB (Client Portal or mobile app; BasketTrader cannot trade fractions).'}`]));
   renderChecks($('#holdchecks'),checks);
+  if(typeof renderSanity==='function' && S.selected && S.selected.length) renderSanity();
   recompute();   // refresh the review table so Hold now / Action populate
 }
 function loadPrevBasket(text){ $('#holdpaste').value=text; applyHoldings(text); }
